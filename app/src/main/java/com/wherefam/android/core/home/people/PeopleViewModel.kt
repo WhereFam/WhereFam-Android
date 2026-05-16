@@ -2,42 +2,56 @@ package com.wherefam.android.core.home.people
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wherefam.android.data.PeerRepository
+import com.wherefam.android.data.PeerDao
 import com.wherefam.android.data.UserRepository
 import com.wherefam.android.data.local.Peer
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class PeopleViewModel(private val userRepository: UserRepository, private val peerRepository: PeerRepository) :
-    ViewModel() {
-    private val _peopleList = MutableStateFlow<List<Peer>>(emptyList())
-    val peopleList: StateFlow<List<Peer>> = _peopleList
+class PeopleViewModel(
+    private val userRepository: UserRepository,
+    private val peerDao: PeerDao
+) : ViewModel() {
 
-    init {
+    val peopleList: StateFlow<List<Peer>> = peerDao.getAllPeers()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val inviteCode: StateFlow<String> = userRepository.pendingInviteCode
+
+    // Prevent duplicate pairing attempts
+    private var isJoining = false
+
+    fun addPerson(peer: Peer) = viewModelScope.launch { peerDao.upsert(peer) }
+
+    fun removePerson(id: String) = viewModelScope.launch {
+        peerDao.findById(id)?.let {
+            peerDao.delete(it)
+            userRepository.leavePeer(id)
+        }
+    }
+
+    fun createInvite() = viewModelScope.launch {
+        isJoining = false  // reset so a new invite can be accepted
+        userRepository.createInvite()
+    }
+
+    fun joinWithInvite(invite: String) {
+        if (isJoining) return  // already in progress
+        isJoining = true
         viewModelScope.launch {
-            peerRepository.getAllPeers().collectLatest { peers ->
-                _peopleList.value = peers
+            try {
+                userRepository.joinWithInvite(invite)
+            } finally {
+                // Reset after a delay to allow re-trying if it failed
+                delay(5000)
+                isJoining = false
             }
         }
     }
 
-    fun addPerson(peer: Peer) {
-        viewModelScope.launch {
-            peerRepository.upsert(peer)
-        }
-    }
-
-    fun removePerson(id: String) {
-        viewModelScope.launch {
-            val peer = _peopleList.value.find { it.id == id }
-            peer?.let { peerRepository.delete(it) }
-        }
-    }
-
-    suspend fun joinPeer(key: String) {
+    fun joinPeer(key: String) = viewModelScope.launch {
+        peerDao.upsert(Peer(id = key))
         userRepository.joinPeer(key)
     }
-
 }
