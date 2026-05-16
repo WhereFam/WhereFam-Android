@@ -5,7 +5,6 @@ import androidx.lifecycle.LifecycleCoroutineScope
 import com.wherefam.android.data.ipc.IPCUtils.readStream
 import com.wherefam.android.processing.MessageProcessor
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import to.holepunch.bare.kit.IPC
 
@@ -17,9 +16,21 @@ class IPCMessageConsumer(
 
     fun startConsuming() {
         lifecycleScope?.launch(Dispatchers.IO) {
-            ipc.readStream().collectLatest { data ->
-                messageProcessor.processMessage(data)
+            val buffer = StringBuilder()
+            ipc.readStream().collect { chunk ->
+                buffer.append(chunk)
+                // Process all complete newline-delimited messages
+                // Same logic as the JS ipc.js ipcBuffer accumulator
+                var newlineIndex = buffer.indexOf('\n')
+                while (newlineIndex != -1) {
+                    val line = buffer.substring(0, newlineIndex).trim()
+                    buffer.delete(0, newlineIndex + 1)
+                    if (line.isNotEmpty()) {
+                        messageProcessor.processMessage(line)
+                    }
+                    newlineIndex = buffer.indexOf('\n')
+                }
             }
-        } ?: Log.e("IPCMessageConsumer", "lifecycleScope is null, cannot start consuming.")
+        } ?: Log.e("IPCMessageConsumer", "lifecycleScope is null")
     }
 }
