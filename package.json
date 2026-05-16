@@ -17,25 +17,21 @@
   },
   "homepage": "https://github.com/holepunchto/bare-android#readme",
   "devDependencies": {
-    "bare-link": "^1.4.1",
-    "bare-pack": "^1.4.1",
+    "bare-link": "^3.2.2",
+    "bare-pack": "^2.0.1",
     "prettier": "^3.5.3",
     "prettier-config-standard": "^7.0.0"
   },
   "dependencies": {
     "b4a": "^1.6.7",
-    "bare-events": "^2.5.4",
-    "compact-encoding": "^2.16.1",
-    "corestore": "^7.4.5",
-    "hyperbee": "^2.24.3",
-    "hypercore": "^11.11.1",
-    "hypercore-blob-server": "^1.11.0",
-    "hyperswarm": "^4.12.1",
-    "sodium-native": "^5.0.5",
-    "protomux": "^3.10.1",
-    "udx-native": "^1.18.2"
-  },
-  "overrides": {
-    "hypercore-byte-stream": "^2.0.2"
+    "bare-events": "^2.8.3",
+    "blind-pairing": "^2.3.1",
+    "compact-encoding": "^3.0.1",
+    "corestore": "^7.9.2",
+    "hyperbee": "^2.27.3",
+    "hypercore": "^11.30.1",
+    "hypercore-blob-server": "^1.13.0",
+    "hyperswarm": "^4.17.0",
+    "protomux": "^3.11.0"
   }
 }
