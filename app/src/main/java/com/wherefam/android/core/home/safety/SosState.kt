@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 sealed class SosState {
     object Idle      : SosState()
@@ -33,7 +34,7 @@ class SafetyViewModel(
         countdownJob = viewModelScope.launch {
             for (i in 5 downTo 1) {
                 _sosState.value = SosState.Countdown(i)
-                delay(1000)
+                delay(1000.milliseconds)
             }
             _sosState.value = SosState.Active
             sendSOS()
@@ -44,7 +45,7 @@ class SafetyViewModel(
         countdownJob?.cancel()
         _sosState.value = SosState.Cancelled
         viewModelScope.launch {
-            delay(2000)
+            delay(2000.milliseconds)
             _sosState.value = SosState.Idle
         }
     }

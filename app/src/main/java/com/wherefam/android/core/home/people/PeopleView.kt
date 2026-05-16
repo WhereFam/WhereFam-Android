@@ -47,16 +47,17 @@ import com.google.zxing.*
 import com.google.zxing.common.HybridBinarizer
 import com.wherefam.android.R
 import com.wherefam.android.data.local.Peer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PeopleView(viewModel: PeopleViewModel = koinViewModel(), contentPadding: PaddingValues = PaddingValues()) {
     val people by viewModel.peopleList.collectAsState()
     val inviteCode by viewModel.inviteCode.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
 
     var showInviteSheet by remember { mutableStateOf(false) }
     var showScanSheet by remember { mutableStateOf(false) }
@@ -344,7 +345,7 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
                     )
                     copied = true
                     coroutineScope.launch {
-                        kotlinx.coroutines.delay(2000)
+                        delay(2000.milliseconds)
                         copied = false
                     }
                 },

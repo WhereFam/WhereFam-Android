@@ -7,7 +7,9 @@ import com.wherefam.android.data.PeerDao
 import com.wherefam.android.data.ipc.IPCUtils.writeAsync
 import com.wherefam.android.data.local.GenericAction
 import com.wherefam.android.data.local.Peer
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -19,7 +21,7 @@ import java.nio.charset.Charset
 class HomeViewModel(
     context: Context,
     private val ipc: IPC,
-    private val peerDao: PeerDao
+    peerDao: PeerDao
 ) : ViewModel() {
 
     private val fileDir = context.filesDir

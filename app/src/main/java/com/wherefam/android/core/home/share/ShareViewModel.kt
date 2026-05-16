@@ -13,7 +13,10 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.wherefam.android.data.UserRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -25,13 +28,11 @@ class ShareViewModel(private val userRepository: UserRepository) : ViewModel() {
     val inviteCode: StateFlow<String> = userRepository.pendingInviteCode
 
     private val _inviteQr  = MutableStateFlow<ImageBitmap?>(null)
-    val inviteQr: StateFlow<ImageBitmap?> = _inviteQr.asStateFlow()
 
     private val _permanentQr = MutableStateFlow<ImageBitmap?>(null)
     val permanentQr: StateFlow<ImageBitmap?> = _permanentQr.asStateFlow()
 
     private val _generating = MutableStateFlow(false)
-    val generating: StateFlow<Boolean> = _generating.asStateFlow()
 
     init {
         viewModelScope.launch {

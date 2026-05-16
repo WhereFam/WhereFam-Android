@@ -2,16 +2,17 @@ package com.wherefam.android.core.home
 
 import android.content.Intent
 import android.graphics.Color
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import com.wherefam.android.core.home.people.PeopleView
 import com.wherefam.android.core.home.places.PlacesView
 import com.wherefam.android.core.home.safety.SafetyView
@@ -24,11 +25,7 @@ import org.koin.compose.koinInject
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.Style
-import org.ramani.compose.CameraPosition
-import org.ramani.compose.LocationStyling
-import org.ramani.compose.MapLibre
-import org.ramani.compose.Symbol
-import org.ramani.compose.rememberMapViewWithLifecycle
+import org.ramani.compose.*
 
 enum class HomeTab { Map, People, Places, Safety, Settings }
 
@@ -116,7 +113,7 @@ fun HomeView(
                     styleBuilder    = Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty"),
                     cameraPosition  = cameraPosition.value,
                     locationStyling = LocationStyling(enablePulse = true, pulseColor = Color.BLUE),
-                    renderMode      = renderMode.value,
+                    renderMode      = renderMode.intValue,
                     mapView         = mapView
                 ) {
                     peers.forEach { peer ->

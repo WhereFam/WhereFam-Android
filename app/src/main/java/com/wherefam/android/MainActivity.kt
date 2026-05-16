@@ -9,7 +9,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
-import com.wherefam.android.core.home.HomeViewModel
 import com.wherefam.android.core.onboarding.SplashViewModel
 import com.wherefam.android.core.root.ContentView
 import com.wherefam.android.data.UserRepository
@@ -33,7 +32,6 @@ class MainActivity : ComponentActivity() {
     private val messageProcessor: GenericMessageProcessor by inject()
     private val userRepository: UserRepository by inject()
     private var ipcMessageConsumer: IPCMessageConsumer? = null
-    private val homeViewModel: HomeViewModel by viewModel()
     private val splashViewModel: SplashViewModel by viewModel()
 
     // Pending invite from deep link arriving before JS is ready

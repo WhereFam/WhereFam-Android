@@ -5,8 +5,8 @@ import com.wherefam.android.core.home.HomeViewModel
 import com.wherefam.android.core.home.people.PeopleViewModel
 import com.wherefam.android.core.home.places.PlacesViewModel
 import com.wherefam.android.core.home.safety.SafetyViewModel
-import com.wherefam.android.core.home.share.ShareViewModel
 import com.wherefam.android.core.home.settings.SettingsViewModel
+import com.wherefam.android.core.home.share.ShareViewModel
 import com.wherefam.android.core.onboarding.OnboardingViewModel
 import com.wherefam.android.core.onboarding.SplashViewModel
 import com.wherefam.android.core.onboarding.ThirdPageViewModel
@@ -48,7 +48,7 @@ val viewModel = module {
     viewModel { HomeViewModel(get(), get(), get()) }
     viewModel { ShareViewModel(get()) }
     viewModel { PeopleViewModel(get(), get()) }
-    viewModel { PlacesViewModel(get(), get()) }
+    viewModel { PlacesViewModel(get()) }
     viewModel { SafetyViewModel(get(), get()) }
     viewModel { SettingsViewModel(get(), get()) }
 }

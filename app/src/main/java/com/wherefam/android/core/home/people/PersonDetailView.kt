@@ -10,16 +10,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.wherefam.android.data.LocationHistoryDao
 import com.wherefam.android.data.local.DataStoreRepository
@@ -41,7 +45,6 @@ fun PersonDetailView(
     onBack:   () -> Unit,
     onRemove: (Peer) -> Unit
 ) {
-    val context              = LocalContext.current
     val historyDao: LocationHistoryDao   = koinInject()
     val dataStore: DataStoreRepository   = koinInject()
 
@@ -65,7 +68,7 @@ fun PersonDetailView(
                 title = { Text(peer.name ?: "Person") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -265,8 +268,8 @@ fun TimelineRow(entry: LocationHistory, isLast: Boolean) {
 }
 
 private fun formatTime(ts: Long): String {
-    val sdf = java.text.SimpleDateFormat("HH:mm · MMM d", java.util.Locale.getDefault())
-    return sdf.format(java.util.Date(ts))
+    val sdf = java.text.SimpleDateFormat("HH:mm · MMM d", Locale.getDefault())
+    return sdf.format(Date(ts))
 }
 
 @Composable

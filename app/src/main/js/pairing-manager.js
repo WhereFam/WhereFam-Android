@@ -21,7 +21,7 @@ function init (swarm) {
 }
 
 // User A — generate invite, wait for candidate
-async function createInvite (ownPublicKeyHex) {
+async function createInvite () {
   if (!_pairing) throw new Error('[pairing] not initialized')
 
   // Random rendezvous secret — just needed to derive the DHT discovery key
@@ -65,7 +65,7 @@ async function joinWithInvite (inviteHex, ownPublicKeyHex) {
   const candidate = _pairing.addCandidate({
     invite,
     userData,
-    async onadd (result) {
+    async onadd () {
       // result.key = rendezvousKey (ignore it)
       // We need User A's public key — but User A didn't send it as userData.
       // Instead, User A will joinPeer(us) and we'll get connected via Hyperswarm.

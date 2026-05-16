@@ -6,8 +6,11 @@ import com.wherefam.android.data.PeerDao
 import com.wherefam.android.data.UserRepository
 import com.wherefam.android.data.local.Peer
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 class PeopleViewModel(
     private val userRepository: UserRepository,
@@ -21,8 +24,6 @@ class PeopleViewModel(
 
     // Prevent duplicate pairing attempts
     private var isJoining = false
-
-    fun addPerson(peer: Peer) = viewModelScope.launch { peerDao.upsert(peer) }
 
     fun removePerson(id: String) = viewModelScope.launch {
         peerDao.findById(id)?.let {
@@ -44,7 +45,7 @@ class PeopleViewModel(
                 userRepository.joinWithInvite(invite)
             } finally {
                 // Reset after a delay to allow re-trying if it failed
-                delay(5000)
+                delay(5000.milliseconds)
                 isJoining = false
             }
         }
