@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,31 +31,30 @@ import com.wherefam.android.core.permissions.PermissionDialog
 
 @Composable
 fun FourthPageView() {
-
     val permissions = arrayOf(
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_FINE_LOCATION
     )
 
-    val context = LocalContext.current
+    val context  = LocalContext.current
     val activity = context as? Activity
+    val packageName = context.packageName  // fixed: was hardcoded
 
-    var permissionDialog by remember { mutableStateOf(false) }
-    var launchAppSettings by remember { mutableStateOf(false) }
+    var permissionDialog    by remember { mutableStateOf(false) }
+    var launchAppSettings   by remember { mutableStateOf(false) }
 
-    val permissionsResultActivityLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { result ->
-            permissions.forEach { permission ->
-                if (result[permission] == false) {
-                    if (activity != null && !shouldShowRequestPermissionRationale(activity, permission)) {
-                        launchAppSettings = true
-                    }
-                    permissionDialog = true
+    val permissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        permissions.forEach { permission ->
+            if (result[permission] == false) {
+                if (activity != null && !shouldShowRequestPermissionRationale(activity, permission)) {
+                    launchAppSettings = true
                 }
+                permissionDialog = true
             }
         }
-    )
+    }
 
     Column(
         modifier = Modifier
@@ -67,65 +64,44 @@ fun FourthPageView() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-
         Image(
             imageVector = Icons.Filled.LocationOn,
             contentDescription = "Location Icon",
             colorFilter = ColorFilter.tint(Color.White),
-            modifier = Modifier
-                .size(200.dp)
-                .padding(bottom = 32.dp)
+            modifier = Modifier.size(200.dp).padding(bottom = 32.dp)
         )
-
         Text(
-            text = "Would you like to find family and friends nearby?",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            color = Color.White,
+            text = "Know your family is safe",
+            fontSize = 28.sp, fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center, color = Color.White,
             modifier = Modifier.padding(8.dp)
         )
-
         Text(
-            text = "Start sharing your location now",
-            textAlign = TextAlign.Center,
-            color = Color.White,
-            modifier = Modifier
-                .size(width = 140.dp, height = 50.dp)
-                .padding(8.dp)
+            text = "Allow location access to share your position with your circle",
+            textAlign = TextAlign.Center, color = Color.White.copy(alpha = 0.85f),
+            fontSize = 16.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-
         Spacer(modifier = Modifier.height(48.dp))
-
         Button(
             onClick = {
-                permissions.forEach { permission ->
-                    val isGranted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-
-                    if (!isGranted) {
-                        if (activity != null && shouldShowRequestPermissionRationale(activity, permission)) {
-                            permissionDialog = true
-                        }
-                        else {
-                            permissionsResultActivityLauncher.launch(permissions)
-                        }
+                val allGranted = permissions.all {
+                    ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                }
+                if (!allGranted) {
+                    val showRationale = permissions.any { permission ->
+                        activity != null && shouldShowRequestPermissionRationale(activity, permission)
                     }
+                    if (showRationale) permissionDialog = true
+                    else permissionsLauncher.launch(permissions)
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = CustomOrange
+                containerColor = Color.White, contentColor = CustomOrange
             ),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Text(
-                text = "Allow Location Access",
-                fontSize = 22.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
+            Text("Allow Location Access", fontSize = 22.sp, modifier = Modifier.padding(vertical = 8.dp))
         }
 
         if (permissionDialog) {
@@ -133,17 +109,13 @@ fun FourthPageView() {
                 onDismiss = { permissionDialog = false },
                 onConfirm = {
                     permissionDialog = false
-
                     if (launchAppSettings) {
-                        Intent(
-                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.fromParts("package", "to.holepunch.bare.android", null)
-                        ).also { intent ->
-                            context.startActivity(intent)
-                        }
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", packageName, null))
+                            .also { context.startActivity(it) }
                         launchAppSettings = false
                     } else {
-                        permissionsResultActivityLauncher.launch(permissions)
+                        permissionsLauncher.launch(permissions)
                     }
                 }
             )
