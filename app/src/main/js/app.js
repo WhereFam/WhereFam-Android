@@ -1,65 +1,72 @@
-// src/index.js
-const ipc = require('./ipc')
-const hyperbeeManager = require('./hyperbee-manager')
+// app/js/app.js  (Android — no feeds)
+'use strict'
+
+const ipc               = require('./ipc')
+const hyperbeeManager   = require('./hyperbee-manager')
+const identityManager   = require('./identity-manager')
 const hyperswarmManager = require('./hyperswarm-manager')
-const mapManager = require('./map-manager')
-const locationManager = require('./location-manager')
+const protocolManager   = require('./protocol-manager')
+const pairingManager    = require('./pairing-manager')
 
-console.log('Application starting...')
+let joiningInProgress = false
 
-// IPC Event Listeners
 ipc.on('start', async (data) => {
-  const documentsPath = data['path']
   try {
-    await hyperbeeManager.initializeHyperbee(documentsPath)
-    const keyPair = await hyperbeeManager.getOrCreateKeyPair()
+    console.log('[app] booting...')
+    const bee = await hyperbeeManager.initializeHyperbee(data.path)
+    await identityManager.initIdentity(bee)
+    const keyPair      = identityManager.getKeyPair()
+    const publicKeyHex = identityManager.getPublicKeyHex()
     await hyperswarmManager.initializeHyperswarm(keyPair)
-    // await mapManager.getMaps(documentsPath)
-    locationManager.setupLocationProtocol()
-    console.log('All managers initialized and protocols registered.')
-  } catch (error) {
-    console.error('Failed to start application:', error)
-  }
-})
-
-ipc.on('requestPublicKey', async () => {
-  try {
-    const publicKey = await hyperbeeManager.getPublicKeyFromDb()
-    if (publicKey) {
-      ipc.send('publicKeyResponse', { publicKey: publicKey })
-    } else {
-      console.warn('Public key not found in database.')
+    protocolManager.setupProtocol()
+    pairingManager.init(hyperswarmManager.getSwarm())
+    // Rejoin known peers from previous sessions
+    const knownPeers = await hyperbeeManager.getKnownPeers()
+    for (const [peerHex] of knownPeers) {
+      await hyperswarmManager.joinPeer(peerHex)
     }
-  } catch (error) {
-    console.error('Error requesting public key:', error)
+    ipc.send('ready', { publicKey: publicKeyHex })
+    console.log('[app] ready, pk:', publicKeyHex.slice(0, 12) + '...')
+  } catch (err) {
+    console.error('[app] startup failed:', err)
+    ipc.send('startupError', { message: err.message })
   }
 })
 
-ipc.on('joinPeer', async (data) => {
-  const peerPublicKey = data['peerPublicKey']
-  console.log('Received "joinPeer" event for:', peerPublicKey)
+ipc.on('requestPublicKey', () => {
+  ipc.send('publicKeyResponse', { publicKey: identityManager.getPublicKeyHex() })
+})
+
+ipc.on('joinPeer',  (data) => hyperswarmManager.joinPeer(data.peerPublicKey || data))
+ipc.on('leavePeer', (data) => hyperswarmManager.leavePeer(data.peerPublicKey || data))
+
+ipc.on('createInvite', async () => {
+  joiningInProgress = false  // reset on new invite
   try {
-    hyperswarmManager.joinPeer(peerPublicKey)
-  } catch (error) {
-    console.error('Failed to join peer:', error)
+    const invite = await pairingManager.createInvite(identityManager.getPublicKeyHex())
+    ipc.send('inviteCreated', { invite })
+  } catch (e) {
+    console.error('[pairing] createInvite error:', e.message)
   }
 })
 
-ipc.on('locationUpdate', async (data) => {
-  console.log('Received "locationUpdate" event.')
+ipc.on('joinWithInvite', async ({ invite }) => {
+  if (joiningInProgress) {
+    console.warn('[pairing] already joining, ignoring duplicate')
+    return
+  }
+  joiningInProgress = true
   try {
-    locationManager.sendLocationToPeers(data)
-  } catch (error) {
-    console.error('Failed to send user location:', error)
+    await pairingManager.joinWithInvite(invite, identityManager.getPublicKeyHex())
+  } catch (e) {
+    console.error('[pairing] joinWithInvite error:', e.message)
+  } finally {
+    setTimeout(() => { joiningInProgress = false }, 10000)
   }
 })
 
-ipc.on('leavePeer', async (data) => {
-  const peerPublicKey = data['peerPublicKey']
-  try {
-    await hyperswarmManager.closeConnection(peerPublicKey)
-    hyperswarmManager.leavePeer(peerPublicKey)
-  } catch (error) {
-    console.error('Failed to leave peer:', error)
-  }
-})
+ipc.on('locationUpdate', (data) => protocolManager.sendLocation(data))
+ipc.on('placeEvent',     (data) => protocolManager.sendPlaceEvent(data))
+ipc.on('sosAlert',       (data) => protocolManager.sendSOS(data))
+ipc.on('batteryUpdate',  (data) => protocolManager.sendBattery(data))
+ipc.on('saveProfile',    (data) => protocolManager.sendProfile(data))
