@@ -13,57 +13,63 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.wherefam.android.data.UserRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ShareViewModel(private val userRepository: UserRepository) : ViewModel() {
+
     val publicKey: StateFlow<String> = userRepository.currentPublicKey
 
-    private val _qrCodeBitmap = MutableStateFlow<ImageBitmap?>(null)
-    val qrCodeBitmap = _qrCodeBitmap.asStateFlow()
+    // Invite flow
+    val inviteCode: StateFlow<String> = userRepository.pendingInviteCode
+
+    private val _inviteQr  = MutableStateFlow<ImageBitmap?>(null)
+    val inviteQr: StateFlow<ImageBitmap?> = _inviteQr.asStateFlow()
+
+    private val _permanentQr = MutableStateFlow<ImageBitmap?>(null)
+    val permanentQr: StateFlow<ImageBitmap?> = _permanentQr.asStateFlow()
+
+    private val _generating = MutableStateFlow(false)
+    val generating: StateFlow<Boolean> = _generating.asStateFlow()
 
     init {
         viewModelScope.launch {
             publicKey.collectLatest { key ->
-                if (key.isNotEmpty()) {
-                    generateAndSetQrCode(key)
-                } else {
-                    _qrCodeBitmap.value = null
-                }
+                if (key.isNotEmpty()) _permanentQr.value = generateQr(key)
             }
         }
-    }
-
-    suspend fun requestPublicKey() {
-        userRepository.requestPublicKey()
-    }
-
-    private fun generateAndSetQrCode(shareID: String) {
         viewModelScope.launch {
-            val generatedBitmap = withContext(Dispatchers.Default) {
-                val size = 512
-                val hints = hashMapOf<EncodeHintType, Int>().also {
-                    it[EncodeHintType.MARGIN] = 1
+            inviteCode.collectLatest { code ->
+                if (code.isNotEmpty()) {
+                    _inviteQr.value = generateQr("wherefam://invite?code=$code")
+                    _generating.value = false
                 }
-
-                val bits = QRCodeWriter().encode(shareID, BarcodeFormat.QR_CODE, size, size, hints)
-                val bitmap = createBitmap(size, size, Bitmap.Config.RGB_565).also {
-                    for (x in 0 until size) {
-                        for (y in 0 until size) {
-                            it[x, y] = if (bits[x, y]) Color.BLACK else Color.WHITE
-                        }
-                    }
-                }
-
-                bitmap.asImageBitmap()
             }
-
-            _qrCodeBitmap.value = generatedBitmap
-
         }
     }
+
+    suspend fun requestPublicKey() = userRepository.requestPublicKey()
+
+    fun createInvite() {
+        _generating.value = true
+        _inviteQr.value   = null
+        viewModelScope.launch { userRepository.createInvite() }
+    }
+
+    fun joinWithInvite(invite: String) {
+        viewModelScope.launch { userRepository.joinWithInvite(invite) }
+    }
+
+    private suspend fun generateQr(content: String): ImageBitmap =
+        withContext(Dispatchers.Default) {
+            val size  = 512
+            val hints = hashMapOf(EncodeHintType.MARGIN to 1)
+            val bits  = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+            val bmp   = createBitmap(size, size, Bitmap.Config.RGB_565).also { bmp ->
+                for (x in 0 until size) for (y in 0 until size)
+                    bmp[x, y] = if (bits[x, y]) Color.BLACK else Color.WHITE
+            }
+            bmp.asImageBitmap()
+        }
 }

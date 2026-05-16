@@ -11,14 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,31 +24,29 @@ import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun ShareIDView(shareViewModel: ShareViewModel = koinViewModel()) {
-    val qrCodeBitmap by shareViewModel.qrCodeBitmap.collectAsState()
-    val publicKey by shareViewModel.publicKey.collectAsState()
-    val context = LocalContext.current
+    val permanentQr by shareViewModel.permanentQr.collectAsState()
+    val publicKey   by shareViewModel.publicKey.collectAsState()
+    val context     = LocalContext.current
 
     LaunchedEffect(Unit) {
-        if (publicKey.isEmpty()) {
-            shareViewModel.requestPublicKey()
-        }
+        if (publicKey.isEmpty()) shareViewModel.requestPublicKey()
     }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxWidth().padding(16.dp)
     ) {
         CustomToolbar(
-            title = "Share Your ID",
+            title       = "Share Your ID",
             onShareClick = { sharePublicKey(context, publicKey) }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        qrCodeBitmap?.let { Image(bitmap = it, contentDescription = "Share QR Code") }
+        permanentQr?.let {
+            Image(bitmap = it, contentDescription = "Share QR Code")
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -62,33 +54,22 @@ fun ShareIDView(shareViewModel: ShareViewModel = koinViewModel()) {
 
         if (publicKey.isNotEmpty()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BasicTextField(
-                    value = publicKey,
-                    onValueChange = {},
-                    enabled = false,
-                    singleLine = true,
+                    value = publicKey, onValueChange = {},
+                    enabled = false, singleLine = true,
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp)
+                        .weight(1f).padding(8.dp)
                         .border(1.dp, MaterialTheme.colorScheme.onSurface)
                         .background(MaterialTheme.colorScheme.background)
-                        .padding(8.dp),
+                        .padding(8.dp)
                 )
-
                 Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(onClick = {
-                    copyToClipboard(context, publicKey)
-                }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.baseline_content_copy_24),
-                        contentDescription = "Copy Public Key"
-                    )
+                IconButton(onClick = { copyToClipboard(context, publicKey) }) {
+                    Icon(painter = painterResource(id = R.drawable.baseline_content_copy_24),
+                        contentDescription = "Copy Public Key")
                 }
             }
         }
@@ -96,27 +77,15 @@ fun ShareIDView(shareViewModel: ShareViewModel = koinViewModel()) {
 }
 
 @Composable
-fun CustomToolbar(
-    title: String,
-    onShareClick: () -> Unit
-) {
+fun CustomToolbar(title: String, onShareClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         Spacer(modifier = Modifier.weight(0.2f))
-
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f)
-        )
-
-
+        Text(text = title, style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
         IconButton(onClick = onShareClick) {
             Icon(imageVector = Icons.Default.Share, contentDescription = "Share Public Key")
         }
@@ -131,8 +100,7 @@ fun sharePublicKey(context: Context, publicKey: String) {
     context.startActivity(Intent.createChooser(intent, "Share Public Key"))
 }
 
-fun copyToClipboard(context: Context, publicKey: String) {
+fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("Public Key", publicKey)
-    clipboard.setPrimaryClip(clip)
+    clipboard.setPrimaryClip(ClipData.newPlainText("Public Key", text))
 }
