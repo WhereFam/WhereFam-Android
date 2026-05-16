@@ -399,16 +399,15 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
 
 @Composable
 fun InviteQRCode(inviteCode: String) {
-    val context = LocalContext.current
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(inviteCode) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val content = "wherefam://invite?code=$inviteCode"
             val size = 512
-            val hints = hashMapOf(com.google.zxing.EncodeHintType.MARGIN to 1)
+            val hints = hashMapOf(EncodeHintType.MARGIN to 1)
             val bits = com.google.zxing.qrcode.QRCodeWriter()
-                .encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size, hints)
+                .encode(content, BarcodeFormat.QR_CODE, size, size, hints)
             val bmp = createBitmap(size, size, Bitmap.Config.RGB_565)
             for (x in 0 until size) for (y in 0 until size)
                 bmp[x, y] = if (bits[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
@@ -478,7 +477,6 @@ fun QRScannerSheet(onScanned: (String) -> Unit, onDismiss: () -> Unit) {
 
 @Composable
 fun CameraPreview(onQrScanned: (String) -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
     var scanned by remember { mutableStateOf(false) }
