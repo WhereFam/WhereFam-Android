@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.people
+package com.wherefam.android.core.people
 
 import androidx.compose.foundation.background
 import androidx.compose.material3.Icon

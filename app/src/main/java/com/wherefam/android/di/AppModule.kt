@@ -2,14 +2,14 @@ package com.wherefam.android.di
 
 import androidx.room.Room
 import com.wherefam.android.core.home.HomeViewModel
-import com.wherefam.android.core.home.people.PeopleViewModel
-import com.wherefam.android.core.home.places.PlacesViewModel
-import com.wherefam.android.core.home.safety.SafetyViewModel
-import com.wherefam.android.core.home.settings.SettingsViewModel
-import com.wherefam.android.core.home.share.ShareViewModel
 import com.wherefam.android.core.onboarding.OnboardingViewModel
 import com.wherefam.android.core.onboarding.SplashViewModel
 import com.wherefam.android.core.onboarding.ThirdPageViewModel
+import com.wherefam.android.core.people.PeopleViewModel
+import com.wherefam.android.core.places.PlacesViewModel
+import com.wherefam.android.core.safety.SafetyViewModel
+import com.wherefam.android.core.settings.SettingsViewModel
+import com.wherefam.android.core.share.ShareViewModel
 import com.wherefam.android.data.MIGRATION_1_2
 import com.wherefam.android.data.MIGRATION_2_3
 import com.wherefam.android.data.UserRepository

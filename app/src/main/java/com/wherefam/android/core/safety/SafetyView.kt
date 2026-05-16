@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.safety
+package com.wherefam.android.core.safety
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background

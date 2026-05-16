@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.places
+package com.wherefam.android.core.places
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

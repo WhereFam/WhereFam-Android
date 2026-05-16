@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.safety
+package com.wherefam.android.core.safety
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

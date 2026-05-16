@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.settings
+package com.wherefam.android.core.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

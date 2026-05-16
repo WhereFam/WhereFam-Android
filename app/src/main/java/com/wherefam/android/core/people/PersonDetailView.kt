@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.people
+package com.wherefam.android.core.people
 
 import android.graphics.BitmapFactory
 import android.location.Geocoder

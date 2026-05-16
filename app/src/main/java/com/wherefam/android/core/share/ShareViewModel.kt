@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.share
+package com.wherefam.android.core.share
 
 import android.graphics.Bitmap
 import android.graphics.Color

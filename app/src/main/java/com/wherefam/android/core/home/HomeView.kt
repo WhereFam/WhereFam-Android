@@ -13,11 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
-import com.wherefam.android.core.home.people.PeopleView
-import com.wherefam.android.core.home.places.PlacesView
-import com.wherefam.android.core.home.safety.SafetyView
-import com.wherefam.android.core.home.settings.SettingsView
-import com.wherefam.android.core.home.share.ShareIDView
+import com.wherefam.android.core.people.PeopleView
+import com.wherefam.android.core.places.PlacesView
+import com.wherefam.android.core.safety.SafetyView
+import com.wherefam.android.core.settings.SettingsView
+import com.wherefam.android.core.share.ShareIDView
 import com.wherefam.android.manager.LocationManager
 import com.wherefam.android.manager.LocationTrackerService
 import org.koin.androidx.compose.koinViewModel

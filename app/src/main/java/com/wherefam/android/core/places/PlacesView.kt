@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.places
+package com.wherefam.android.core.places
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

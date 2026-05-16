@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.people
+package com.wherefam.android.core.people
 
 import SwipeToDeleteContainer
 import android.Manifest
