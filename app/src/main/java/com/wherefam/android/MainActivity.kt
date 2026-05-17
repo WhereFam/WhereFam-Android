@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
@@ -33,13 +34,12 @@ class MainActivity : ComponentActivity() {
     private val userRepository: UserRepository by inject()
     private var ipcMessageConsumer: IPCMessageConsumer? = null
     private val splashViewModel: SplashViewModel by viewModel()
-
-    // Pending invite from deep link arriving before JS is ready
     private var pendingInvite: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        actionBar?.hide()
+        enableEdgeToEdge()
+//        actionBar?.hide()
 
         worklet = Worklet(null)
         try {
@@ -53,23 +53,24 @@ class MainActivity : ComponentActivity() {
             throw RuntimeException(e)
         }
 
-        // Notification channels
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         listOf(
             Triple(LocationTrackerService.LOCATION_CHANNEL, "Location",       NotificationManager.IMPORTANCE_LOW),
-            Triple("place_alerts",                           "Place Alerts",   NotificationManager.IMPORTANCE_DEFAULT),
-            Triple("sos_alerts",                             "SOS Alerts",     NotificationManager.IMPORTANCE_HIGH),
-            Triple("battery_alerts",                         "Battery Alerts", NotificationManager.IMPORTANCE_DEFAULT),
+            Triple("place_alerts",                          "Place Alerts",   NotificationManager.IMPORTANCE_DEFAULT),
+            Triple("sos_alerts",                            "SOS Alerts",     NotificationManager.IMPORTANCE_HIGH),
+            Triple("battery_alerts",                        "Battery Alerts", NotificationManager.IMPORTANCE_DEFAULT),
         ).forEach { (id, name, importance) ->
             nm.createNotificationChannel(NotificationChannel(id, name, importance))
         }
 
-        // Handle deep link invite on cold launch
         handleDeepLink(intent)
 
-        // Once JS is ready, process any pending invite
         lifecycleScope.launch {
             userRepository.currentPublicKey.first { it.isNotEmpty() }
+            // Start location service once JS is ready
+            startForegroundService(Intent(this@MainActivity, LocationTrackerService::class.java).apply {
+                action = LocationTrackerService.Action.START.name
+            })
             pendingInvite?.let { code ->
                 pendingInvite = null
                 userRepository.joinWithInvite(code)
@@ -86,7 +87,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Called for both cold launch and when app is already running
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleDeepLink(intent)
@@ -95,32 +95,23 @@ class MainActivity : ComponentActivity() {
     private fun handleDeepLink(intent: Intent?) {
         val uri = intent?.data ?: return
         if (uri.scheme != "wherefam") return
-
         when (uri.host) {
             "invite" -> {
                 val code = uri.getQueryParameter("code") ?: return
-                if (userRepository.currentPublicKey.value.isNotEmpty()) {
-                    // JS already ready — fire immediately
+                if (userRepository.currentPublicKey.value.isNotEmpty())
                     lifecycleScope.launch { userRepository.joinWithInvite(code) }
-                } else {
-                    // Store for when JS boots
-                    pendingInvite = code
-                }
+                else pendingInvite = code
             }
             "add" -> {
-                // Legacy — direct peer key
                 val key = uri.getQueryParameter("id") ?: return
-                if (userRepository.currentPublicKey.value.isNotEmpty()) {
+                if (userRepository.currentPublicKey.value.isNotEmpty())
                     lifecycleScope.launch { userRepository.joinPeer(key) }
-                } else {
-                    // Could store similarly — skip for now
-                }
             }
         }
     }
 
     override fun onPause()   { super.onPause();   worklet?.suspend() }
-    override fun onResume()  { super.onResume();  worklet?.resume() }
+    override fun onResume()  { super.onResume();  worklet?.resume()  }
     override fun onDestroy() {
         super.onDestroy()
         worklet?.terminate(); worklet = null
