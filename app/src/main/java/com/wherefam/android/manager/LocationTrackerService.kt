@@ -19,7 +19,7 @@ import kotlin.math.*
 class LocationTrackerService : Service() {
 
     private val scope               = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val locationManager:      LocationManager     by inject()
+    private val locationManager:      WhereFamLocationManager     by inject()
     private val userRepository:       UserRepository      by inject()
     private val dataStoreRepository:  DataStoreRepository by inject()
     private val placeDao:             PlaceDao            by inject()

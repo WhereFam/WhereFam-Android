@@ -9,7 +9,6 @@ import com.wherefam.android.core.people.PeopleViewModel
 import com.wherefam.android.core.places.PlacesViewModel
 import com.wherefam.android.core.safety.SafetyViewModel
 import com.wherefam.android.core.settings.SettingsViewModel
-import com.wherefam.android.core.share.ShareViewModel
 import com.wherefam.android.data.MIGRATION_1_2
 import com.wherefam.android.data.MIGRATION_2_3
 import com.wherefam.android.data.UserRepository
@@ -17,13 +16,13 @@ import com.wherefam.android.data.WhereFamDatabase
 import com.wherefam.android.data.ipc.IPCProvider
 import com.wherefam.android.data.ipc.UserRepositoryImpl
 import com.wherefam.android.data.local.DataStoreRepository
-import com.wherefam.android.manager.LocationManager
+import com.wherefam.android.manager.WhereFamLocationManager
 import com.wherefam.android.processing.GenericMessageProcessor
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
-    single { LocationManager(get()) }
+    single { WhereFamLocationManager(get()) }
     single { IPCProvider.ipc!! }
     single { DataStoreRepository(get()) }
     single<UserRepository> { UserRepositoryImpl(get()) }
@@ -46,7 +45,6 @@ val viewModel = module {
     viewModel { OnboardingViewModel(get()) }
     viewModel { ThirdPageViewModel(get(), get()) }
     viewModel { HomeViewModel(get(), get(), get()) }
-    viewModel { ShareViewModel(get()) }
     viewModel { PeopleViewModel(get(), get()) }
     viewModel { PlacesViewModel(get()) }
     viewModel { SafetyViewModel(get(), get()) }
