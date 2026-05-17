@@ -17,7 +17,6 @@ import com.wherefam.android.core.people.PeopleView
 import com.wherefam.android.core.places.PlacesView
 import com.wherefam.android.core.safety.SafetyView
 import com.wherefam.android.core.settings.SettingsView
-import com.wherefam.android.core.share.ShareIDView
 import com.wherefam.android.manager.LocationManager
 import com.wherefam.android.manager.LocationTrackerService
 import org.koin.androidx.compose.koinViewModel
@@ -87,13 +86,6 @@ fun HomeView(
                     label      = { Text("Settings") }
                 )
             }
-        },
-        floatingActionButton = {
-            if (selectedTab == HomeTab.Map) {
-                SmallFloatingActionButton(onClick = { showShareSheet = true }) {
-                    Icon(imageVector = Icons.Default.Share, contentDescription = "Share ID")
-                }
-            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -159,16 +151,6 @@ fun HomeView(
                     .zIndex(if (selectedTab == HomeTab.Settings) 1f else -1f)
                     .then(if (selectedTab != HomeTab.Settings) Modifier.alpha(0f) else Modifier)
             ) { SettingsView(contentPadding = innerPadding) }
-        }
-    }
-
-    // Share ID sheet
-    if (showShareSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showShareSheet = false },
-            sheetState       = rememberModalBottomSheetState()
-        ) {
-            ShareIDView()
         }
     }
 }

@@ -30,7 +30,6 @@
     "corestore": "^7.9.2",
     "hyperbee": "^2.27.3",
     "hypercore": "^11.30.1",
-    "hypercore-blob-server": "^1.13.0",
     "hyperswarm": "^4.17.0",
     "protomux": "^3.11.0"
   }
