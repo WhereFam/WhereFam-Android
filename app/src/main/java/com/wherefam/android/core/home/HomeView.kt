@@ -37,7 +37,6 @@ fun HomeView(
     val context        = LocalContext.current
     val peers          by homeViewModel.peers.collectAsState()
     var selectedTab    by remember { mutableStateOf(HomeTab.Map) }
-    var showShareSheet by remember { mutableStateOf(false) }
 
     val cameraPosition = rememberSaveable { mutableStateOf(CameraPosition(zoom = 14.0)) }
     val renderMode     = rememberSaveable { mutableIntStateOf(RenderMode.NORMAL) }
