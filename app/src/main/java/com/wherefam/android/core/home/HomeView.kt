@@ -1,5 +1,6 @@
 package com.wherefam.android.core.home
 
+import android.graphics.*
 import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -16,51 +17,144 @@ import com.wherefam.android.core.people.PeopleView
 import com.wherefam.android.core.places.PlacesView
 import com.wherefam.android.core.safety.SafetyView
 import com.wherefam.android.core.settings.SettingsView
+import com.wherefam.android.data.local.DataStoreRepository
 import com.wherefam.android.manager.WhereFamLocationManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
-import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
-import org.ramani.compose.CameraPosition
+import org.maplibre.android.plugins.annotation.Symbol
+import org.maplibre.android.plugins.annotation.SymbolManager
+import org.maplibre.android.plugins.annotation.SymbolOptions
+import org.maplibre.android.style.layers.Property.TEXT_ANCHOR_TOP
 import org.ramani.compose.rememberMapViewWithLifecycle
 
 enum class HomeTab { Map, People, Places, Safety, Settings }
+
+private const val PEER_ICON = "peer-avatar"
+
+private fun drawPeerAvatar(initials: String, isOnline: Boolean, photo: android.graphics.Bitmap? = null): Bitmap {
+    val size = 96
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+
+    if (photo != null) {
+        // Clip photo to circle
+        val shader = android.graphics.BitmapShader(
+            android.graphics.Bitmap.createScaledBitmap(photo, size, size, true),
+            android.graphics.Shader.TileMode.CLAMP,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            setShader(shader)
+        })
+    } else {
+        // Initials circle
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isOnline) 0xFF4CAF50.toInt() else 0xFF9E9E9E.toInt()
+        })
+        val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFFFFFFF.toInt(); textSize = 36f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(initials.take(2).uppercase(), size / 2f, size / 2f - (tp.descent() + tp.ascent()) / 2f, tp)
+    }
+
+    // White border ring
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f - 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = 4f
+    })
+    // Online dot bottom-right
+    val dotRadius = 10f
+    val dotX = size - dotRadius - 2f
+    val dotY = size - dotRadius - 2f
+    canvas.drawCircle(dotX, dotY, dotRadius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isOnline) 0xFF4CAF50.toInt() else 0xFF9E9E9E.toInt()
+    })
+    canvas.drawCircle(dotX, dotY, dotRadius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = 2f
+    })
+
+    return bmp
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeView(
     homeViewModel: HomeViewModel = koinViewModel(),
-    locationManager: WhereFamLocationManager = koinInject()
+    locationManager: WhereFamLocationManager = koinInject(),
+    dataStore: DataStoreRepository = koinInject()
 ) {
     val context        = androidx.compose.ui.platform.LocalContext.current
     val peers          by homeViewModel.peers.collectAsState()
     var selectedTab    by rememberSaveable { mutableStateOf(HomeTab.Map) }
-    val cameraPosition = rememberSaveable { mutableStateOf(CameraPosition(zoom = 14.0)) }
     val mapView        = rememberMapViewWithLifecycle()
-    var mapReady       by remember { mutableStateOf<MapLibreMap?>(null) }
+
+    // SymbolManager + symbol map — same pattern as old version
+    var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
+    val peerSymbols   = remember { mutableStateMapOf<String, Symbol>() }
+    var mapRef        by remember { mutableStateOf<MapLibreMap?>(null) }
 
     LaunchedEffect(Unit) {
         homeViewModel.start()
-        locationManager.getLocation { lat, lon ->
-            cameraPosition.value = CameraPosition(target = LatLng(lat, lon), zoom = 14.0)
-        }
     }
 
-    LaunchedEffect(peers, mapReady) {
-        val map = mapReady ?: return@LaunchedEffect
-        map.clear()
+    // Update symbols whenever peers or symbolManager changes
+    LaunchedEffect(peers, symbolManager) {
+        val sm  = symbolManager ?: return@LaunchedEffect
+        val map = mapRef        ?: return@LaunchedEffect
+
+        val currentIds = peers.map { it.id }.toSet()
+        (peerSymbols.keys - currentIds).forEach { id ->
+            peerSymbols[id]?.let { sm.delete(it) }
+            peerSymbols.remove(id)
+        }
+
         peers.forEach { peer ->
-            val lat = peer.latitude ?: return@forEach
+            val lat = peer.latitude  ?: return@forEach
             val lon = peer.longitude ?: return@forEach
-            map.addMarker(
-                MarkerOptions()
-                    .position(LatLng(lat, lon))
-                    .title(peer.name ?: peer.id.take(8))
-                    .snippet(if (peer.isOnline) "Online · ${peer.lastSeenText}" else peer.lastSeenText)
-            )
+            val latLng = LatLng(lat, lon)
+            val label  = buildString {
+                append(peer.name ?: peer.id.take(8))
+                if (peer.isDriving) append(" 🚗")
+            }
+            val imgKey = "avatar_${peer.id}"
+
+            // Always register/refresh the avatar image in the style
+            val style = map.style
+            if (style != null) {
+                val photo = withContext(Dispatchers.IO) {
+                    val file = dataStore.getPeerImageFile(peer.id)
+                    if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
+                }
+                style.addImage(imgKey, drawPeerAvatar(peer.initials, peer.isOnline, photo))
+            }
+
+            val existing = peerSymbols[peer.id]
+            if (existing != null) {
+                existing.latLng    = latLng
+                existing.textField = label
+                sm.update(existing)
+            } else {
+                val symbol = sm.create(
+                    SymbolOptions()
+                        .withLatLng(latLng)
+                        .withIconImage(imgKey)
+                        .withIconSize(1.0f)
+                        .withTextField(label)
+                        .withTextSize(12f)
+                        .withTextFont(arrayOf("Noto Sans Regular"))
+                        .withTextAnchor(TEXT_ANCHOR_TOP)
+                        .withTextOffset(arrayOf(0f, 0.8f))
+                )
+                if (symbol != null) peerSymbols[peer.id] = symbol
+            }
         }
     }
 
@@ -72,7 +166,7 @@ fun HomeView(
         bottomBar = {
             NavigationBar {
                 listOf(
-                    Triple(HomeTab.Map,      Icons.Default.Place,           "Map"),
+                    Triple(HomeTab.Map,      Icons.Default.Map,             "Map"),
                     Triple(HomeTab.People,   Icons.Default.Group,           "People"),
                     Triple(HomeTab.Places,   Icons.Default.LocationOn,      "Places"),
                     Triple(HomeTab.Safety,   Icons.Default.HealthAndSafety, "Safety"),
@@ -88,49 +182,48 @@ fun HomeView(
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        Box(modifier = Modifier.fillMaxSize()) {
 
-            // MapView kept alive via AndroidView + GONE/VISIBLE
-            // GONE = not drawn, not measured, but still in memory — no reload on return
             AndroidView(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
                 factory  = { mapView },
                 update   = { view ->
                     view.visibility = if (selectedTab == HomeTab.Map) View.VISIBLE else View.GONE
                 }
             )
 
-            // Wire MapLibre only once via getMapAsync
             LaunchedEffect(mapView) {
                 mapView.getMapAsync { map ->
-                    map.setStyle(
-                        Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty")
-                    ) {
-                        // Enable location component
-                        if (map.locationComponent.isLocationComponentActivated.not()) {
+                    map.setStyle(Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty")) { style ->
+
+                        // Blue dot
+                        if (!map.locationComponent.isLocationComponentActivated) {
                             map.locationComponent.activateLocationComponent(
-                                org.maplibre.android.location.LocationComponentActivationOptions
-                                    .builder(context, it)
-                                    .useDefaultLocationEngine(false)
-                                    .build()
+                                LocationComponentActivationOptions.builder(context, style)
+                                    .useDefaultLocationEngine(false).build()
                             )
                             map.locationComponent.isLocationComponentEnabled = true
                             map.locationComponent.renderMode = RenderMode.COMPASS
                         }
-                        mapReady = map
-                    }
-                    // Move camera to user location
-                    locationManager.getLocation { lat, lon ->
-                        map.moveCamera(
-                            org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
-                                LatLng(lat, lon), 14.0
+
+                        // Camera to user location
+                        locationManager.getLocation { lat, lon ->
+                            map.moveCamera(
+                                org.maplibre.android.camera.CameraUpdateFactory
+                                    .newLatLngZoom(LatLng(lat, lon), 14.0)
                             )
-                        )
+                        }
+
+                        // Init SymbolManager — triggers LaunchedEffect(peers, symbolManager)
+                        mapRef = map
+                        symbolManager = SymbolManager(mapView, map, style).apply {
+                            iconAllowOverlap = true
+                            textAllowOverlap = true
+                        }
                     }
                 }
             }
 
-            // Active tab content
             when (selectedTab) {
                 HomeTab.People   -> PeopleView()
                 HomeTab.Places   -> PlacesView()
