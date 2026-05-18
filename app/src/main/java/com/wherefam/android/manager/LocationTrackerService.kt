@@ -4,8 +4,11 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.BatteryManager
 import android.os.IBinder
+import android.util.Base64
 import androidx.core.app.NotificationCompat
 import com.wherefam.android.R
 import com.wherefam.android.data.PlaceDao
@@ -123,11 +126,11 @@ class LocationTrackerService : Service() {
         try {
             val bytes  = imageFile.readBytes()
             // Resize to max 200×200 before sending
-            val bmp    = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            val scaled = android.graphics.Bitmap.createScaledBitmap(bmp, 200, 200, true)
+            val bmp    = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            val scaled = Bitmap.createScaledBitmap(bmp, 200, 200, true)
             val stream = java.io.ByteArrayOutputStream()
-            scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 60, stream)
-            val b64 = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+            scaled.compress(Bitmap.CompressFormat.JPEG, 60, stream)
+            val b64 = Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
             userRepository.sendProfile(mapOf(
                 "id"         to publicKey,
                 "name"       to name,
