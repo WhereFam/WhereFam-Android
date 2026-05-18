@@ -76,7 +76,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation:1.8.2")
     implementation('org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0')
     implementation('com.google.zxing:core:3.5.3')
-    implementation('org.ramani-maps:ramani-maplibre:0.9.2')
+    implementation('org.ramani-maps:ramani-maplibre:0.10.0')
     implementation("io.insert-koin:koin-core:4.0.3")
     implementation("io.insert-koin:koin-android:4.0.3")
     implementation("io.insert-koin:koin-compose:4.0.3")
