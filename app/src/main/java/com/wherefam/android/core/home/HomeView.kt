@@ -1,155 +1,157 @@
 package com.wherefam.android.core.home
 
-import android.content.Intent
 import android.graphics.Color
-import androidx.compose.foundation.layout.Box
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.zIndex
-import com.wherefam.android.core.people.PeopleView
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.wherefam.android.core.home.people.PeopleView
 import com.wherefam.android.core.places.PlacesView
 import com.wherefam.android.core.safety.SafetyView
 import com.wherefam.android.core.settings.SettingsView
-import com.wherefam.android.manager.LocationManager
-import com.wherefam.android.manager.LocationTrackerService
+import com.wherefam.android.data.local.Peer
+import com.wherefam.android.manager.WhereFamLocationManager
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.modes.RenderMode
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import org.ramani.compose.*
+import org.ramani.compose.CameraPosition
+import org.ramani.compose.LocationStyling
+import org.ramani.compose.MapLibre
+import org.ramani.compose.rememberMapViewWithLifecycle
 
-enum class HomeTab { Map, People, Places, Safety, Settings }
+private fun addPeerMarkersToStyle(style: Style, mapView: MapView, peers: List<Peer>) {
+    mapView.getMapAsync { map ->
+        map.clear()
+        peers.forEach { peer ->
+            val lat = peer.latitude ?: return@forEach
+            val lon = peer.longitude ?: return@forEach
+            val label = buildString {
+                append(peer.initials)
+                if (peer.isDriving) append(" 🚗")
+            }
+            map.addMarker(
+                MarkerOptions()
+                    .position(LatLng(lat, lon))
+                    .title(peer.name ?: peer.id.take(8))
+                    .snippet(if (peer.isOnline) "Online" else peer.lastSeenText)
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeView(
     homeViewModel: HomeViewModel = koinViewModel(),
-    locationManager: LocationManager = koinInject()
+    locationManager: WhereFamLocationManager = koinInject()
 ) {
-    val context        = LocalContext.current
+    val context        = androidx.compose.ui.platform.LocalContext.current
     val peers          by homeViewModel.peers.collectAsState()
-    var selectedTab    by remember { mutableStateOf(HomeTab.Map) }
+    val navController  = rememberNavController()
+    val currentRoute   = navController.currentBackStackEntryAsState().value?.destination?.route
 
     val cameraPosition = rememberSaveable { mutableStateOf(CameraPosition(zoom = 14.0)) }
     val renderMode     = rememberSaveable { mutableIntStateOf(RenderMode.NORMAL) }
+
+    // Hoist mapView so it survives tab switches — only the Compose wrapper recreates
+    val mapView = rememberMapViewWithLifecycle()
 
     LaunchedEffect(Unit) {
         homeViewModel.start()
         locationManager.getLocation { lat, lon ->
             cameraPosition.value = CameraPosition(target = LatLng(lat, lon), zoom = 14.0)
         }
-        context.startService(Intent(context, LocationTrackerService::class.java).apply {
-            action = LocationTrackerService.Action.START.name
-        })
+    }
+
+    BackHandler(enabled = currentRoute != "map") {
+        navController.navigate("map") {
+            popUpTo("map") { inclusive = false }
+            launchSingleTop = true
+        }
     }
 
     Scaffold(
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(
-                    selected   = selectedTab == HomeTab.Map,
-                    onClick    = { selectedTab = HomeTab.Map },
-                    icon       = { Icon(imageVector = Icons.Default.Place,       contentDescription = "Map") },
-                    label      = { Text("Map") }
-                )
-                NavigationBarItem(
-                    selected   = selectedTab == HomeTab.People,
-                    onClick    = { selectedTab = HomeTab.People },
-                    icon       = { Icon(imageVector = Icons.Default.Group,       contentDescription = "People") },
-                    label      = { Text("People") }
-                )
-                NavigationBarItem(
-                    selected   = selectedTab == HomeTab.Places,
-                    onClick    = { selectedTab = HomeTab.Places },
-                    icon       = { Icon(imageVector = Icons.Default.LocationOn,  contentDescription = "Places") },
-                    label      = { Text("Places") }
-                )
-                NavigationBarItem(
-                    selected   = selectedTab == HomeTab.Safety,
-                    onClick    = { selectedTab = HomeTab.Safety },
-                    icon       = { Icon(imageVector = Icons.Default.HealthAndSafety, contentDescription = "Safety") },
-                    label      = { Text("Safety") }
-                )
-                NavigationBarItem(
-                    selected   = selectedTab == HomeTab.Settings,
-                    onClick    = { selectedTab = HomeTab.Settings },
-                    icon       = { Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings") },
-                    label      = { Text("Settings") }
-                )
+                listOf(
+                    Triple("map",      Icons.Default.Place,           "Map"),
+                    Triple("people",   Icons.Default.Group,           "People"),
+                    Triple("places",   Icons.Default.LocationOn,      "Places"),
+                    Triple("safety",   Icons.Default.HealthAndSafety, "Safety"),
+                    Triple("settings", Icons.Default.Settings,        "Settings"),
+                ).forEach { (route, icon, label) ->
+                    NavigationBarItem(
+                        selected = currentRoute == route,
+                        onClick  = {
+                            if (currentRoute != route) {
+                                navController.navigate(route) {
+                                    popUpTo("map") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState    = true
+                                }
+                            }
+                        },
+                        icon  = { Icon(icon, contentDescription = label) },
+                        label = { Text(label) }
+                    )
+                }
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Hoist MapView so it's created once and never destroyed on tab switch
-            val mapView = rememberMapViewWithLifecycle()
+        NavHost(
+            navController    = navController,
+            startDestination = "map",
+            modifier         = Modifier.fillMaxSize().padding(innerPadding)
+        ) {
+            composable("map") {
+                val currentPeers by rememberUpdatedState(peers)
+                var mapReady by remember { mutableStateOf<MapLibreMap?>(null) }
 
-            // All tabs are always composed — just hidden/shown instantly
-            // This avoids first-render lag when switching tabs
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(if (selectedTab == HomeTab.Map) 1f else 0f)
-                    .then(if (selectedTab != HomeTab.Map) Modifier.alpha(0f) else Modifier)
-            ) {
+                // Update markers whenever peers change and map is ready
+                LaunchedEffect(currentPeers, mapReady) {
+                    val map = mapReady ?: return@LaunchedEffect
+                    map.clear()
+                    currentPeers.forEach { peer ->
+                        val lat = peer.latitude ?: return@forEach
+                        val lon = peer.longitude ?: return@forEach
+                        map.addMarker(
+                            MarkerOptions()
+                                .position(LatLng(lat, lon))
+                                .title(peer.name ?: peer.id.take(8))
+                                .snippet(if (peer.isOnline) "Online · ${peer.lastSeenText}"
+                                else peer.lastSeenText)
+                        )
+                    }
+                }
+
                 MapLibre(
                     modifier        = Modifier.fillMaxSize(),
                     styleBuilder    = Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty"),
                     cameraPosition  = cameraPosition.value,
                     locationStyling = LocationStyling(enablePulse = true, pulseColor = Color.BLUE),
                     renderMode      = renderMode.intValue,
-                    mapView         = mapView
-                ) {
-                    peers.forEach { peer ->
-                        if (peer.latitude != null && peer.longitude != null) {
-                            Symbol(
-                                center = LatLng(peer.latitude, peer.longitude),
-                                size   = 5f,
-                                text   = buildString {
-                                    append(peer.initials)
-                                    if (peer.isDriving) append(" 🚗")
-                                },
-                                color  = if (peer.isOnline) "#4CAF50" else "#9E9E9E"
-                            )
-                        }
-                    }
-                }
+                    mapView         = mapView,
+                    onStyleLoaded   = { mapView.getMapAsync { mapReady = it } }
+                )
             }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(if (selectedTab == HomeTab.People) 1f else -1f)
-                    .then(if (selectedTab != HomeTab.People) Modifier.alpha(0f) else Modifier)
-            ) { PeopleView(contentPadding = innerPadding) }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(if (selectedTab == HomeTab.Places) 1f else -1f)
-                    .then(if (selectedTab != HomeTab.Places) Modifier.alpha(0f) else Modifier)
-            ) { PlacesView(contentPadding = innerPadding) }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(if (selectedTab == HomeTab.Safety) 1f else -1f)
-                    .then(if (selectedTab != HomeTab.Safety) Modifier.alpha(0f) else Modifier)
-            ) { SafetyView(contentPadding = innerPadding) }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(if (selectedTab == HomeTab.Settings) 1f else -1f)
-                    .then(if (selectedTab != HomeTab.Settings) Modifier.alpha(0f) else Modifier)
-            ) { SettingsView(contentPadding = innerPadding) }
+            composable("people")   { PeopleView(contentPadding = innerPadding) }
+            composable("places")   { PlacesView(contentPadding = innerPadding) }
+            composable("safety")   { SafetyView(contentPadding = innerPadding) }
+            composable("settings") { SettingsView(contentPadding = innerPadding) }
         }
     }
 }
