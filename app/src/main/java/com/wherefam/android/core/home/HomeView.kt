@@ -31,6 +31,7 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.plugins.annotation.Symbol
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
+import org.maplibre.android.style.layers.Property.ICON_ANCHOR_BOTTOM
 import org.maplibre.android.style.layers.Property.TEXT_ANCHOR_TOP
 import org.ramani.compose.rememberMapViewWithLifecycle
 
@@ -38,17 +39,17 @@ enum class HomeTab { Map, People, Places, Safety, Settings }
 
 private const val PEER_ICON = "peer-avatar"
 
-private fun drawPeerAvatar(initials: String, isOnline: Boolean, photo: android.graphics.Bitmap? = null): Bitmap {
+private fun drawPeerAvatar(initials: String, isOnline: Boolean, photo: Bitmap? = null): Bitmap {
     val size = 96
     val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bmp)
 
     if (photo != null) {
         // Clip photo to circle
-        val shader = android.graphics.BitmapShader(
-            android.graphics.Bitmap.createScaledBitmap(photo, size, size, true),
-            android.graphics.Shader.TileMode.CLAMP,
-            android.graphics.Shader.TileMode.CLAMP
+        val shader = BitmapShader(
+            Bitmap.createScaledBitmap(photo, size, size, true),
+            Shader.TileMode.CLAMP,
+            Shader.TileMode.CLAMP
         )
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             setShader(shader)
@@ -146,9 +147,10 @@ fun HomeView(
                     SymbolOptions()
                         .withLatLng(latLng)
                         .withIconImage(imgKey)
+                        .withIconAnchor(ICON_ANCHOR_BOTTOM)
                         .withIconSize(1.0f)
                         .withTextField(label)
-                        .withTextSize(12f)
+                        .withTextSize(14f)
                         .withTextFont(arrayOf("Noto Sans Regular"))
                         .withTextAnchor(TEXT_ANCHOR_TOP)
                         .withTextOffset(arrayOf(0f, 0.8f))
@@ -225,10 +227,10 @@ fun HomeView(
             }
 
             when (selectedTab) {
-                HomeTab.People   -> PeopleView()
-                HomeTab.Places   -> PlacesView()
-                HomeTab.Safety   -> SafetyView()
-                HomeTab.Settings -> SettingsView()
+                HomeTab.People   -> PeopleView(contentPadding = innerPadding)
+                HomeTab.Places   -> PlacesView(contentPadding = innerPadding)
+                HomeTab.Safety   -> SafetyView(contentPadding = innerPadding)
+                HomeTab.Settings -> SettingsView(contentPadding = innerPadding)
                 HomeTab.Map      -> Unit
             }
         }
