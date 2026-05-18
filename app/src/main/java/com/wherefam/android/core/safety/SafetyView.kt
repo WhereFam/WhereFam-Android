@@ -28,11 +28,14 @@ fun SafetyView(viewModel: SafetyViewModel = koinViewModel(), contentPadding: Pad
     val sosState by viewModel.sosState.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(contentPadding).padding(horizontal = 24.dp, vertical = 24.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(contentPadding)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Text("Safety", style = MaterialTheme.typography.headlineMedium)
-
+        Text("Safety", style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(vertical = 8.dp))
         // SOS card
         SOSCard(
             sosState = sosState,

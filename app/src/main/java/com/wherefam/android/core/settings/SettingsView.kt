@@ -31,7 +31,7 @@ fun SettingsView(
         modifier = Modifier
             .fillMaxWidth()
             .padding(contentPadding)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium,

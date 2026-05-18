@@ -1,4 +1,4 @@
-package com.wherefam.android.core.home.people
+package com.wherefam.android.core.people
 
 import SwipeToDeleteContainer
 import android.Manifest
@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -13,6 +15,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,16 +37,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.zxing.*
 import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.qrcode.QRCodeWriter
 import com.wherefam.android.R
-import com.wherefam.android.core.people.PeopleViewModel
-import com.wherefam.android.core.people.PersonDetailView
+import com.wherefam.android.core.home.people.PersonDetailView
 import com.wherefam.android.data.local.Peer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
 
@@ -59,160 +69,178 @@ fun PeopleView(viewModel: PeopleViewModel = koinViewModel(), contentPadding: Pad
     var showPasteDialog by remember { mutableStateOf(false) }
     var selectedPeer by remember { mutableStateOf<Peer?>(null) }
 
-    if (selectedPeer != null) {
-        PersonDetailView(
-            peer = selectedPeer!!,
-            onBack = { selectedPeer = null },
-            onRemove = { p -> viewModel.removePerson(p.id); selectedPeer = null }
-        )
-    } else {
-
-        // Auto-show invite sheet when invite code is created
-        LaunchedEffect(inviteCode) {
-            if (inviteCode.isNotEmpty()) showInviteSheet = true
+    // Only show invite sheet when code freshly generated (empty → non-empty transition)
+    var lastInviteCode by remember { mutableStateOf(inviteCode) }  // init with current so tab return doesn't trigger
+    LaunchedEffect(inviteCode) {
+        if (inviteCode.isNotEmpty() && lastInviteCode.isEmpty()) {
+            showInviteSheet = true
         }
-
-        Column(modifier = Modifier.fillMaxWidth().padding(contentPadding)) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("People", style = MaterialTheme.typography.headlineMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = { showScanSheet = true }) {
-                        Icon(
-                            painterResource(R.drawable.round_qr_code_2_24),
-                            contentDescription = "Scan invite"
-                        )
-                    }
-                    IconButton(onClick = {
-                        viewModel.createInvite()
-                        showInviteSheet = true
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add person")
-                    }
-                }
-            }
-
-            if (people.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
-                        Text(
-                            "No people yet", style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "Tap + to invite a family member",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(people, key = { it.id }) { peer ->
-                            SwipeToDeleteContainer(item = peer, onDelete = {
-                                viewModel.removePerson(peer.id)
-                            }) {
-                                PeerRow(peer = peer, onClick = { selectedPeer = peer })
-                            }
-                            if (peer != people.lastOrNull())
-                                HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        // Invite sheet
-        if (showInviteSheet) {
-            val inviteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val inviteScope = rememberCoroutineScope()
-            ModalBottomSheet(
-                onDismissRequest = {
-                    inviteScope.launch { inviteSheetState.hide() }.invokeOnCompletion {
-                        showInviteSheet = false
-                    }
-                },
-                sheetState = inviteSheetState,
-                dragHandle = null,
-            ) {
-                InviteSheet(
-                    viewModel = viewModel,
-                    onPasteInstead = {
-                        showInviteSheet = false
-                        showPasteDialog = true
-                    }
-                )
-            }
-        }
-
-        // Scanner sheet
-        if (showScanSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showScanSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            ) {
-                QRScannerSheet(
-                    onScanned = { code ->
-                        showScanSheet = false
-                        val invite = if (code.startsWith("wherefam://invite?code="))
-                            code.removePrefix("wherefam://invite?code=") else code
-                        viewModel.joinWithInvite(invite)
-                    },
-                    onDismiss = { showScanSheet = false }
-                )
-            }
-        }
-
-        // Paste dialog fallback
-        if (showPasteDialog) {
-            AlertDialog(
-                onDismissRequest = { showPasteDialog = false },
-                title = { Text("Enter invite code") },
-                text = {
-                    OutlinedTextField(
-                        value = pasteInput,
-                        onValueChange = { pasteInput = it },
-                        label = { Text("Invite code") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        if (pasteInput.isNotBlank()) {
-                            viewModel.joinWithInvite(pasteInput.trim())
-                            pasteInput = ""
-                            showPasteDialog = false
-                        }
-                    }) { Text("Join") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showPasteDialog = false }) { Text("Cancel") }
-                }
-            )
-        }
+        lastInviteCode = inviteCode
     }
-}
+
+    val peopleNavController = rememberNavController()
+
+    NavHost(
+        navController    = peopleNavController,
+        startDestination = "list",
+        modifier         = Modifier.fillMaxSize()
+    ) {
+        composable("list") {
+
+            Column(modifier = Modifier.fillMaxWidth().padding(contentPadding)) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("People", style = MaterialTheme.typography.headlineMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(onClick = { showScanSheet = true }) {
+                            Icon(
+                                painterResource(R.drawable.round_qr_code_2_24),
+                                contentDescription = "Scan invite"
+                            )
+                        }
+                        IconButton(onClick = {
+                            viewModel.createInvite()
+                            showInviteSheet = true
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add person")
+                        }
+                    }
+                }
+
+                if (people.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                            Text(
+                                "No people yet", style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Tap + to invite a family member",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                            items(people, key = { it.id }) { peer ->
+                                SwipeToDeleteContainer(item = peer, onDelete = {
+                                    viewModel.removePerson(peer.id)
+                                }) {
+                                    PeerRow(peer = peer, onClick = { selectedPeer = peer; peopleNavController.navigate("detail") })
+                                }
+                                if (peer != people.lastOrNull())
+                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Invite sheet
+            if (showInviteSheet) {
+                val inviteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                val inviteScope = rememberCoroutineScope()
+                ModalBottomSheet(
+                    onDismissRequest = {
+                        inviteScope.launch { inviteSheetState.hide() }.invokeOnCompletion {
+                            showInviteSheet = false
+                        }
+                    },
+                    sheetState = inviteSheetState,
+                    dragHandle = null,
+                ) {
+                    InviteSheet(
+                        viewModel = viewModel,
+                        onPasteInstead = {
+                            showInviteSheet = false
+                            showPasteDialog = true
+                        }
+                    )
+                }
+            }
+
+            // Scanner sheet
+            if (showScanSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showScanSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                ) {
+                    QRScannerSheet(
+                        onScanned = { code ->
+                            showScanSheet = false
+                            val invite = if (code.startsWith("wherefam://invite?code="))
+                                code.removePrefix("wherefam://invite?code=") else code
+                            viewModel.joinWithInvite(invite)
+                        },
+                        onDismiss = { showScanSheet = false }
+                    )
+                }
+            }
+
+            // Paste dialog fallback
+            if (showPasteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPasteDialog = false },
+                    title = { Text("Enter invite code") },
+                    text = {
+                        OutlinedTextField(
+                            value = pasteInput,
+                            onValueChange = { pasteInput = it },
+                            label = { Text("Invite code") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            if (pasteInput.isNotBlank()) {
+                                viewModel.joinWithInvite(pasteInput.trim())
+                                pasteInput = ""
+                                showPasteDialog = false
+                            }
+                        }) { Text("Join") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showPasteDialog = false }) { Text("Cancel") }
+                    }
+                )
+            }
+        } // end Column
+        composable("detail") {
+            selectedPeer?.let { peer ->
+                PersonDetailView(
+                    peer = peer,
+                    onRemove = { p ->
+                        viewModel.removePerson(p.id)
+                        peopleNavController.popBackStack()
+                        selectedPeer = null
+                    }
+                )
+            }
+        }
+    } // end Scaffold
+} // end list composable
 
 @Composable
 fun PeerRow(peer: Peer, onClick: () -> Unit = {}) {
@@ -301,7 +329,7 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
             "Share this with a family member. Single-use, expires once accepted.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
 
         if (inviteCode.isEmpty()) {
@@ -328,7 +356,7 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
                     )
                     copied = true
                     coroutineScope.launch {
-                        kotlinx.coroutines.delay(2000)
+                        delay(2000)
                         copied = false
                     }
                 },
@@ -381,16 +409,16 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
 @Composable
 fun InviteQRCode(inviteCode: String) {
     val context = LocalContext.current
-    var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(inviteCode) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        withContext(Dispatchers.Default) {
             val content = "wherefam://invite?code=$inviteCode"
             val size = 512
-            val hints = hashMapOf(com.google.zxing.EncodeHintType.MARGIN to 1)
-            val bits = com.google.zxing.qrcode.QRCodeWriter()
-                .encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size, hints)
-            val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.RGB_565)
+            val hints = hashMapOf(EncodeHintType.MARGIN to 1)
+            val bits = QRCodeWriter()
+                .encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+            val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
             for (x in 0 until size) for (y in 0 until size)
                 bmp.setPixel(x, y, if (bits[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
             bitmap = bmp
@@ -398,7 +426,7 @@ fun InviteQRCode(inviteCode: String) {
     }
 
     bitmap?.let {
-        androidx.compose.foundation.Image(
+        Image(
             bitmap = it.asImageBitmap(),
             contentDescription = "Invite QR",
             modifier = Modifier.size(180.dp)
@@ -413,7 +441,7 @@ fun QRScannerSheet(onScanned: (String) -> Unit, onDismiss: () -> Unit) {
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-                    == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    == PackageManager.PERMISSION_GRANTED
         )
     }
 
