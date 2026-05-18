@@ -52,7 +52,6 @@ import java.util.concurrent.Executors
 fun PeopleView(viewModel: PeopleViewModel = koinViewModel(), contentPadding: PaddingValues = PaddingValues()) {
     val people by viewModel.peopleList.collectAsState()
     val inviteCode by viewModel.inviteCode.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
 
     var showInviteSheet by remember { mutableStateOf(false) }
     var showScanSheet by remember { mutableStateOf(false) }
@@ -68,7 +67,7 @@ fun PeopleView(viewModel: PeopleViewModel = koinViewModel(), contentPadding: Pad
         )
     } else {
 
-        // Auto-dismiss invite sheet when pairing completes
+        // Auto-show invite sheet when invite code is created
         LaunchedEffect(inviteCode) {
             if (inviteCode.isNotEmpty()) showInviteSheet = true
         }
@@ -84,14 +83,12 @@ fun PeopleView(viewModel: PeopleViewModel = koinViewModel(), contentPadding: Pad
             ) {
                 Text("People", style = MaterialTheme.typography.headlineMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Scan icon
                     IconButton(onClick = { showScanSheet = true }) {
                         Icon(
                             painterResource(R.drawable.round_qr_code_2_24),
                             contentDescription = "Scan invite"
                         )
                     }
-                    // + invite
                     IconButton(onClick = {
                         viewModel.createInvite()
                         showInviteSheet = true
@@ -145,8 +142,28 @@ fun PeopleView(viewModel: PeopleViewModel = koinViewModel(), contentPadding: Pad
             }
         }
 
-        // My invite sheet
-
+        // Invite sheet
+        if (showInviteSheet) {
+            val inviteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val inviteScope = rememberCoroutineScope()
+            ModalBottomSheet(
+                onDismissRequest = {
+                    inviteScope.launch { inviteSheetState.hide() }.invokeOnCompletion {
+                        showInviteSheet = false
+                    }
+                },
+                sheetState = inviteSheetState,
+                dragHandle = null,
+            ) {
+                InviteSheet(
+                    viewModel = viewModel,
+                    onPasteInstead = {
+                        showInviteSheet = false
+                        showPasteDialog = true
+                    }
+                )
+            }
+        }
 
         // Scanner sheet
         if (showScanSheet) {
@@ -207,7 +224,6 @@ fun PeerRow(peer: Peer, onClick: () -> Unit = {}) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Avatar circle
         Box(
             modifier = Modifier.size(44.dp)
                 .clip(CircleShape)
@@ -230,7 +246,6 @@ fun PeerRow(peer: Peer, onClick: () -> Unit = {}) {
                     peer.name ?: peer.id.take(12),
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                 )
-                // Online dot
                 Box(
                     modifier = Modifier.size(7.dp).clip(CircleShape)
                         .background(if (peer.isOnline) Color(0xFF4CAF50) else Color.Gray.copy(alpha = 0.4f))
@@ -246,7 +261,6 @@ fun PeerRow(peer: Peer, onClick: () -> Unit = {}) {
             )
         }
 
-        // Battery
         peer.batteryLevel?.let { level ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -297,26 +311,20 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            // QR placeholder — in real app render QR using ZXing like ShareIDView
             Box(
                 modifier = Modifier.size(200.dp)
                     .background(Color.White, RoundedCornerShape(12.dp))
                     .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                // Render QR using ZXing directly
                 InviteQRCode(inviteCode = inviteCode)
             }
 
-            // Copy button
             Button(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(
-                        ClipData.newPlainText(
-                            "invite",
-                            "wherefam://invite?code=$inviteCode"
-                        )
+                        ClipData.newPlainText("invite", "wherefam://invite?code=$inviteCode")
                     )
                     copied = true
                     coroutineScope.launch {
@@ -334,7 +342,6 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
                 Text(if (copied) "Copied!" else "Copy invite link")
             }
 
-            // Share via
             OutlinedButton(
                 onClick = {
                     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -351,7 +358,6 @@ fun InviteSheet(viewModel: PeopleViewModel, onPasteInstead: () -> Unit) {
                 Text("Send via…")
             }
 
-            // Regenerate
             TextButton(onClick = { viewModel.createInvite() }) {
                 Text(
                     "Generate new invite", style = MaterialTheme.typography.labelMedium,
@@ -491,7 +497,6 @@ fun CameraPreview(onQrScanned: (String) -> Unit, modifier: Modifier = Modifier) 
                             scanned = true
                             onQrScanned(result.text)
                         } catch (_: NotFoundException) {
-                            // No QR in this frame — normal, keep scanning
                         } catch (e: Exception) {
                             e.printStackTrace()
                         } finally {
